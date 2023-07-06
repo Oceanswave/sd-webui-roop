@@ -26,7 +26,7 @@ def get_models():
 
 class FaceSwapScript(scripts.Script):
     def title(self):
-        return f"roop"
+        return f"moar roop"
 
     def show(self, is_img2img):
         return scripts.AlwaysVisible
