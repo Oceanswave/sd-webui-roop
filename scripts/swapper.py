@@ -81,10 +81,45 @@ def get_face_single(img_data: np.ndarray, face_index=0, det_size=(640, 640)):
         det_size_half = (det_size[0] // 2, det_size[1] // 2)
         return get_face_single(img_data, face_index=face_index, det_size=det_size_half)
 
-    try:
-        return sorted(face, key=lambda x: x.bbox[0])[face_index]
-    except IndexError:
+    #print(faces)
+    if len(faces) <= 0:
         return None
+    
+    # filter out faces that aren't female using face.gender
+    faces = list(filter(lambda face: True if face.gender == 0 else False, faces))
+
+    # Calculate the center of the image
+    image_height, image_width = img_data.shape[:2]
+    image_center = (image_width // 2, image_height // 2)
+
+    # Calculate areas and categorize bounding boxes
+    areas = [(face.bbox[2] - face.bbox[0]) * (face.bbox[3] - face.bbox[1]) for face in faces]
+
+    # Using histogram to categorize into 3 bins
+    _, bin_edges = np.histogram(areas, bins=3)
+
+    bins = {'small': [], 'medium': [], 'large': []}
+    for face in faces:
+        area = (face.bbox[2] - face.bbox[0]) * (face.bbox[3] - face.bbox[1])
+        if area < bin_edges[1]:
+            bins['small'].append(face)
+        elif area < bin_edges[2]:
+            bins['medium'].append(face)
+        else:
+            bins['large'].append(face)
+
+    # Sort within each bin by distance from center
+    sorted_bins = {}
+    for size in ['large', 'medium', 'small']:
+        sorted_bins[size] = sorted(
+            bins[size], key=lambda face: ((face.bbox[2] + face.bbox[0]) / 2 - image_center[0]) ** 2 + ((face.bbox[3] + face.bbox[1]) / 2 - image_center[1]) ** 2
+        )
+
+    # Flatten the sorted bins into a single list
+    flattened_sorted_bins = [face for size in ['large', 'medium', 'small'] for face in sorted_bins[size]]
+
+
+    return flattened_sorted_bins[face_index]
 
 
 @dataclass
