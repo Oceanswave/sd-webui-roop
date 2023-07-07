@@ -84,6 +84,9 @@ def get_face_single(img_data: np.ndarray, face_index=0, det_size=(640, 640)):
     #print(faces)
     if len(faces) <= 0:
         return None
+
+    # filter out faces with a low confidence score
+    faces = list(filter(lambda face: True if face.det_score > 0.6 else False, faces))
     
     # filter out faces that aren't female using face.gender
     faces = list(filter(lambda face: True if face.gender == 0 else False, faces))
