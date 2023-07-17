@@ -72,37 +72,49 @@ def upscale_image(image: Image, upscale_options: UpscaleOptions):
     return result_image
 
 
-def get_face_single(img_data: np.ndarray, face_index=0, det_size=(640, 640)):
+def get_face_single(img_data: np.ndarray, face_index=0, det_size=(640, 640), det_score = 0.8, gender = 0):
     face_analyser = insightface.app.FaceAnalysis(name="buffalo_l", providers=providers)
     face_analyser.prepare(ctx_id=0, det_size=det_size)
-    face = face_analyser.get(img_data)
+    faces = face_analyser.get(img_data)
 
-    if len(face) == 0 and det_size[0] > 320 and det_size[1] > 320:
+    # if there are no faces detected, try again with a smaller det_size
+    if len(faces) == 0 and det_size[0] > 320 and det_size[1] > 320:
         det_size_half = (det_size[0] // 2, det_size[1] // 2)
         return get_face_single(img_data, face_index=face_index, det_size=det_size_half)
 
     #print(faces)
     if len(faces) <= 0:
         return None
-
-    # filter out faces with a low confidence score
-    faces = list(filter(lambda face: True if face.det_score > 0.6 else False, faces))
     
-    # filter out faces that aren't female using face.gender
-    faces = list(filter(lambda face: True if face.gender == 0 else False, faces))
+    # filter out faces with a low confidence score
+    faces = list(filter(lambda face: True if face.det_score > 0.8 else False, faces))
+
+    # if there are no faces detected, try again with a smaller det_score
+    if len(faces) == 0 and det_score > 0.1:
+        return get_face_single(img_data, face_index=face_index, det_size=det_size, det_score=det_score-0.1)
+
+    if len(faces) <= 0:
+        return None
+    
+    # filter out faces that aren't the indicated gender using face.gender
+    gender_faces = list(filter(lambda face: True if face.gender == gender else False, faces))
+
+    # if we couldn't find gender, use all faces
+    if len(faces) == 0:
+        gender_faces = faces
 
     # Calculate the center of the image
     image_height, image_width = img_data.shape[:2]
     image_center = (image_width // 2, image_height // 2)
 
     # Calculate areas and categorize bounding boxes
-    areas = [(face.bbox[2] - face.bbox[0]) * (face.bbox[3] - face.bbox[1]) for face in faces]
+    areas = [(face.bbox[2] - face.bbox[0]) * (face.bbox[3] - face.bbox[1]) for face in gender_faces]
 
     # Using histogram to categorize into 3 bins
     _, bin_edges = np.histogram(areas, bins=3)
 
     bins = {'small': [], 'medium': [], 'large': []}
-    for face in faces:
+    for face in gender_faces:
         area = (face.bbox[2] - face.bbox[0]) * (face.bbox[3] - face.bbox[1])
         if area < bin_edges[1]:
             bins['small'].append(face)
