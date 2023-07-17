@@ -72,30 +72,27 @@ def upscale_image(image: Image, upscale_options: UpscaleOptions):
     return result_image
 
 
-def get_face_single(img_data: np.ndarray, face_index=0, det_size=(640, 640), det_score = 0.8, gender = 0):
+def get_face_single(img_data: np.ndarray, face_index=0, det_size=(640, 640), det_thresh = 0.8, gender = 0):
     face_analyser = insightface.app.FaceAnalysis(name="buffalo_l", providers=providers)
-    face_analyser.prepare(ctx_id=0, det_size=det_size)
+    face_analyser.prepare(ctx_id=0, det_thresh=det_thresh, det_size=det_size)
     faces = face_analyser.get(img_data)
 
     # if there are no faces detected, try again with a smaller det_size
     if len(faces) == 0 and det_size[0] > 320 and det_size[1] > 320:
         det_size_half = (det_size[0] // 2, det_size[1] // 2)
         return get_face_single(img_data, face_index=face_index, det_size=det_size_half)
-
+    
+    if len(faces) == 0 and det_thresh > 0.1:
+        return get_face_single(img_data, face_index=face_index, det_size=det_size, det_thresh=det_thresh-0.1)
+    
     #print(faces)
     if len(faces) <= 0:
         return None
     
-    # filter out faces with a low confidence score
-    faces = list(filter(lambda face: True if face.det_score > 0.8 else False, faces))
+    # print out all the face.gender, face.sex and face.age values
+    for face in faces:
+        print(f"gender={face.gender}, sex={face.sex}, age={face.age}");
 
-    # if there are no faces detected, try again with a smaller det_score
-    if len(faces) == 0 and det_score > 0.1:
-        return get_face_single(img_data, face_index=face_index, det_size=det_size, det_score=det_score-0.1)
-
-    if len(faces) <= 0:
-        return None
-    
     # filter out faces that aren't the indicated gender using face.gender
     gender_faces = list(filter(lambda face: True if face.gender == gender else False, faces))
 
@@ -132,7 +129,6 @@ def get_face_single(img_data: np.ndarray, face_index=0, det_size=(640, 640), det
 
     # Flatten the sorted bins into a single list
     flattened_sorted_bins = [face for size in ['large', 'medium', 'small'] for face in sorted_bins[size]]
-
 
     return flattened_sorted_bins[face_index]
 
